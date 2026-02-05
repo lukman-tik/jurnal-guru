@@ -5,23 +5,26 @@ export default function JurnalGuru() {
   const [activeTab, setActiveTab] = useState('input'); 
   const [searchTerm, setSearchTerm] = useState('');
 
-  // A. DATABASE JURNAL
+  // STATE UNTUK EDIT DATA
+  const [editingId, setEditingId] = useState(null); // ID jurnal yang sedang diedit (null = mode input baru)
+
+  // DATABASE JURNAL
   const [journals, setJournals] = useState(() => {
     const saved = localStorage.getItem('jurnal_guru_data');
     return saved ? JSON.parse(saved) : [];
   });
 
-  // B. DATABASE SEKOLAH
+  // DATABASE SEKOLAH
   const [schoolData, setSchoolData] = useState(() => {
     const saved = localStorage.getItem('data_sekolah');
     return saved ? JSON.parse(saved) : {}; 
   });
 
-  // C. FORM INPUT & ABSENSI
+  // FORM INPUT
   const [formData, setFormData] = useState({ kelas: '', mapel: '', catatan: '' });
-  const [attendance, setAttendance] = useState({}); // { "Ahmad": "H", "Budi": "S" }
+  const [attendance, setAttendance] = useState({});
 
-  // State Manage Data
+  // STATE MANAGE DATA
   const [newClassName, setNewClassName] = useState('');
   const [selectedClassForStudent, setSelectedClassForStudent] = useState('');
   const [studentListInput, setStudentListInput] = useState('');
@@ -34,20 +37,6 @@ export default function JurnalGuru() {
   useEffect(() => {
     localStorage.setItem('data_sekolah', JSON.stringify(schoolData));
   }, [schoolData]);
-
-  // Saat Kelas dipilih, LOAD data siswa dan set default Hadir (H)
-  useEffect(() => {
-    if (formData.kelas && schoolData[formData.kelas]) {
-      const students = schoolData[formData.kelas];
-      const initialAbsen = {};
-      students.forEach(student => {
-        initialAbsen[student] = 'H'; // Default semua Hadir
-      });
-      setAttendance(initialAbsen);
-    } else {
-      setAttendance({});
-    }
-  }, [formData.kelas, schoolData]);
 
   // --- 3. LOGIC MANAJEMEN DATA ---
   const addClass = () => {
@@ -73,64 +62,104 @@ export default function JurnalGuru() {
     alert(`Berhasil simpan siswa ke ${selectedClassForStudent}!`);
   };
 
-  // --- 4. LOGIC JURNAL & ABSENSI ---
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // --- 4. LOGIC JURNAL & ABSENSI (DI-UPDATE UNTUK EDIT) ---
+  
+  // Fungsi Load Default Absensi (Semua Hadir)
+  const loadDefaultAttendance = (className) => {
+    if (schoolData[className]) {
+      const initialAbsen = {};
+      schoolData[className].forEach(student => initialAbsen[student] = 'H');
+      setAttendance(initialAbsen);
+    }
   };
 
-  // Handle Klik Tombol Absen (H/S/I/A)
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+
+    // Jika ganti KELAS secara manual, reset absensi ke default (H semua)
+    if (name === 'kelas') {
+      loadDefaultAttendance(value);
+    }
+  };
+
   const handleAttendanceChange = (name, status) => {
     setAttendance({ ...attendance, [name]: status });
+  };
+
+  // FUNGSI BARU: PERSIAPAN EDIT
+  const startEditing = (jurnal) => {
+    setEditingId(jurnal.id); // Tandai kita sedang mengedit ID ini
+    setFormData({
+      kelas: jurnal.kelas,
+      mapel: jurnal.mapel,
+      catatan: jurnal.catatan
+    });
+    // Load absensi lama (jika ada), kalau data lama sekali (sebelum fitur absen) load kosong
+    setAttendance(jurnal.attendanceData || {}); 
+    setActiveTab('input'); // Pindah otomatis ke tab input
+    window.scrollTo(0, 0); // Scroll ke atas
+  };
+
+  // FUNGSI BARU: BATAL EDIT
+  const cancelEdit = () => {
+    setEditingId(null);
+    setFormData({ kelas: '', mapel: '', catatan: '' });
+    setAttendance({});
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!formData.kelas || !formData.catatan) return alert("Kelas dan Catatan wajib diisi!");
 
-    // Hitung Ringkasan (Berapa S, I, A)
+    // Hitung Ringkasan Absen
     const summary = { H: 0, S: 0, I: 0, A: 0 };
-    Object.values(attendance).forEach(status => summary[status] += 1);
+    Object.values(attendance).forEach(status => summary[status] = (summary[status] || 0) + 1);
     const summaryText = `H:${summary.H}, S:${summary.S}, I:${summary.I}, A:${summary.A}`;
 
-    const newEntry = {
-      id: Date.now(),
+    const entryData = {
       tanggal: new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
       ...formData,
-      attendanceData: attendance, // Simpan detail per anak
-      summaryText: summaryText    // Simpan rekap angka
+      attendanceData: attendance,
+      summaryText: summaryText
     };
 
-    setJournals([newEntry, ...journals]);
+    if (editingId) {
+      // --- LOGIKA UPDATE (EDIT) ---
+      const updatedJournals = journals.map((item) => 
+        item.id === editingId ? { ...item, ...entryData } : item
+      );
+      setJournals(updatedJournals);
+      alert("Data berhasil di-UPDATE! ✏️");
+      setEditingId(null); // Keluar mode edit
+    } else {
+      // --- LOGIKA SIMPAN BARU ---
+      const newEntry = { id: Date.now(), ...entryData };
+      setJournals([newEntry, ...journals]);
+      alert("Jurnal tersimpan! ✅");
+    }
+
+    // Reset Form
     setFormData({ kelas: '', mapel: '', catatan: '' });
-    // Reset Absensi ke H semua lagi untuk input berikutnya
-    const resetAbsen = {};
-    Object.keys(attendance).forEach(k => resetAbsen[k] = 'H');
-    setAttendance(resetAbsen);
-    
-    alert("Jurnal & Absensi tersimpan! ✅");
+    setAttendance({});
   };
 
   const downloadReport = () => {
     if (journals.length === 0) return alert("Data kosong!");
     let csv = "Tanggal,Kelas,Mapel,Catatan,Rekap Absen,Detail Tidak Hadir\n";
-    
     journals.forEach(row => {
-      // Buat list nama anak yang TIDAK Hadir
       let absentDetails = [];
       if (row.attendanceData) {
         Object.entries(row.attendanceData).forEach(([name, status]) => {
           if (status !== 'H') absentDetails.push(`${name}(${status})`);
         });
       }
-      const absentString = absentDetails.join("; ");
-
-      csv += `${row.tanggal},${row.kelas},${row.mapel},"${row.catatan}","${row.summaryText || '-'}","${absentString}"\n`;
+      csv += `${row.tanggal},${row.kelas},${row.mapel},"${row.catatan}","${row.summaryText || '-'}","${absentDetails.join("; ")}"\n`;
     });
-
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "Laporan_Jurnal_Lengkap.csv";
+    link.download = "Laporan_Jurnal.csv";
     link.click();
   };
 
@@ -146,8 +175,8 @@ export default function JurnalGuru() {
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', fontFamily: 'sans-serif', border: '1px solid #ddd', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
-      <header style={{ padding: '15px', background: '#2563eb', color: 'white', textAlign: 'center' }}>
-        <h2 style={{ margin: 0 }}>📘 Jurnal Guru v2.1</h2>
+      <header style={{ padding: '15px', background: editingId ? '#d97706' : '#2563eb', color: 'white', textAlign: 'center', transition: '0.3s' }}>
+        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v3.0'}</h2>
       </header>
 
       <main style={{ flex: 1, padding: '20px', background: '#f8fafc', paddingBottom: '80px' }}>
@@ -155,19 +184,26 @@ export default function JurnalGuru() {
         {/* INPUT TAB */}
         {activeTab === 'input' && (
           <div>
-            <h3>✍️ Jurnal & Absensi</h3>
+            <h3>{editingId ? '📝 Edit Data Jurnal' : '✍️ Input Jurnal Baru'}</h3>
+            
+            {/* Tombol Batal Edit */}
+            {editingId && (
+              <button onClick={cancelEdit} style={{...buttonStyle, background: '#64748b', marginBottom: '15px', width: '100%'}}>
+                ❌ Batal Edit (Kembali ke Input Baru)
+              </button>
+            )}
+
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              
               <select name="kelas" value={formData.kelas} onChange={handleInputChange} style={{...inputStyle, background: 'white'}}>
                 <option value="">-- Pilih Kelas --</option>
                 {classList.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
 
-              {/* LIST SISWA (MUNCUL JIKA KELAS DIPILIH) */}
+              {/* LIST ABSENSI */}
               {formData.kelas && (
                 <div style={{background: 'white', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', maxHeight: '300px', overflowY: 'auto'}}>
                   <h4 style={{margin: '0 0 10px 0', fontSize: '14px', color: '#444'}}>📋 Daftar Kehadiran:</h4>
-                  {schoolData[formData.kelas]?.length === 0 ? <small>Belum ada siswa di menu Atur.</small> : 
+                  {schoolData[formData.kelas]?.length === 0 ? <small>Belum ada siswa.</small> : 
                     schoolData[formData.kelas].map(student => (
                       <div key={student} style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderBottom: '1px solid #eee', paddingBottom: '5px'}}>
                         <span style={{fontSize: '13px', fontWeight: 'bold'}}>{student}</span>
@@ -178,9 +214,9 @@ export default function JurnalGuru() {
                               type="button"
                               onClick={() => handleAttendanceChange(student, status)}
                               style={{
-                                width: '25px', height: '25px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold', color: 'white',
+                                width: '25px', height: '25px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '10px', fontWeight: 'bold',
                                 background: attendance[student] === status ? 
-                                  (status === 'H' ? '#16a34a' : status === 'S' ? '#ca8a04' : status === 'I' ? '#2563eb' : '#dc2626') : '#e2e8f0', // Warna aktif vs mati
+                                  (status === 'H' ? '#16a34a' : status === 'S' ? '#ca8a04' : status === 'I' ? '#2563eb' : '#dc2626') : '#e2e8f0',
                                 color: attendance[student] === status ? 'white' : '#64748b'
                               }}
                             >
@@ -196,7 +232,10 @@ export default function JurnalGuru() {
 
               <input type="text" name="mapel" placeholder="Mata Pelajaran" value={formData.mapel} onChange={handleInputChange} style={inputStyle} />
               <textarea name="catatan" placeholder="Catatan kejadian..." rows="3" value={formData.catatan} onChange={handleInputChange} style={inputStyle} />
-              <button type="submit" style={buttonStyle}>Simpan Laporan</button>
+              
+              <button type="submit" style={{...buttonStyle, background: editingId ? '#d97706' : '#2563eb'}}>
+                {editingId ? '💾 Update Perubahan' : '💾 Simpan Laporan'}
+              </button>
             </form>
           </div>
         )}
@@ -210,15 +249,17 @@ export default function JurnalGuru() {
               <div key={j.id} style={cardStyle}>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <h4 style={{margin: 0, color: '#2563eb'}}>{j.kelas}</h4>
-                  <button onClick={() => { if(window.confirm('Hapus?')) setJournals(journals.filter(x => x.id !== j.id)) }} style={deleteButtonStyle}>🗑️</button>
+                  <div style={{display: 'flex', gap: '5px'}}>
+                    {/* TOMBOL EDIT (PENSIL) */}
+                    <button onClick={() => startEditing(j)} style={{...deleteButtonStyle, background: '#fef08a', color: '#854d0e'}}>✏️</button>
+                    {/* TOMBOL HAPUS */}
+                    <button onClick={() => { if(window.confirm('Hapus?')) setJournals(journals.filter(x => x.id !== j.id)) }} style={deleteButtonStyle}>🗑️</button>
+                  </div>
                 </div>
                 <small style={{color: '#666'}}>{j.tanggal}</small>
-                
-                {/* REKAP ABSENSI */}
                 <div style={{margin: '8px 0', padding: '5px', background: '#f1f5f9', borderRadius: '5px', fontSize: '12px'}}>
-                  <strong>Absensi:</strong> {j.summaryText || "Belum ada data"}
+                  <strong>Absensi:</strong> {j.summaryText || "-"}
                 </div>
-                
                 <p style={{margin: 0}}>{j.catatan}</p>
               </div>
             ))}
@@ -260,7 +301,9 @@ export default function JurnalGuru() {
       </main>
 
       <nav style={{ display: 'flex', borderTop: '1px solid #ddd', background: 'white', position: 'fixed', bottom: 0, width: '100%', maxWidth: '400px' }}>
-        <button style={navButtonStyle(activeTab === 'input')} onClick={() => setActiveTab('input')}>✏️ Input</button>
+        <button style={navButtonStyle(activeTab === 'input')} onClick={() => setActiveTab('input')}>
+          {editingId ? '✏️ Edit' : '✏️ Input'}
+        </button>
         <button style={navButtonStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>📜 Riwayat</button>
         <button style={navButtonStyle(activeTab === 'manage')} onClick={() => setActiveTab('manage')}>⚙️ Atur</button>
       </nav>
