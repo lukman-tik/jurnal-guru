@@ -6,6 +6,13 @@ export default function JurnalGuru() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null); 
 
+  // STATE KEAMANAN (BARU)
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false); // Apakah gembok terbuka?
+  const [inputPin, setInputPin] = useState(''); // PIN yang diketik user
+  const [savedPin, setSavedPin] = useState(() => {
+    return localStorage.getItem('jurnal_guru_pin') || '1007'; // PIN Default 1007
+  });
+
   // DATABASE JURNAL
   const [journals, setJournals] = useState(() => {
     const saved = localStorage.getItem('jurnal_guru_data');
@@ -26,6 +33,7 @@ export default function JurnalGuru() {
   const [newClassName, setNewClassName] = useState('');
   const [selectedClassForStudent, setSelectedClassForStudent] = useState('');
   const [studentListInput, setStudentListInput] = useState('');
+  const [newPinInput, setNewPinInput] = useState(''); // Untuk form ganti PIN
 
   // --- 2. EFEK SAMPING (AUTO SAVE) ---
   useEffect(() => {
@@ -36,7 +44,34 @@ export default function JurnalGuru() {
     localStorage.setItem('data_sekolah', JSON.stringify(schoolData));
   }, [schoolData]);
 
-  // --- 3. LOGIC MANAJEMEN DATA ---
+  useEffect(() => {
+    localStorage.setItem('jurnal_guru_pin', savedPin);
+  }, [savedPin]);
+
+  // --- 3. LOGIC KEAMANAN (LOGIN ADMIN) ---
+  const handleLoginAdmin = (e) => {
+    e.preventDefault();
+    if (inputPin === savedPin) {
+      setIsAdminUnlocked(true);
+      setInputPin('');
+    } else {
+      alert("PIN SALAH! Akses ditolak.");
+      setInputPin('');
+    }
+  };
+
+  const handleLogoutAdmin = () => {
+    setIsAdminUnlocked(false);
+  };
+
+  const handleChangePin = () => {
+    if (newPinInput.length < 4) return alert("PIN minimal 4 angka!");
+    setSavedPin(newPinInput);
+    setNewPinInput('');
+    alert("PIN Admin berhasil diganti! Jangan sampai lupa ya.");
+  };
+
+  // --- 4. LOGIC MANAJEMEN DATA ---
   const addClass = () => {
     if (!newClassName) return alert("Nama kelas kosong!");
     if (schoolData[newClassName]) return alert("Kelas sudah ada!");
@@ -60,17 +95,8 @@ export default function JurnalGuru() {
     alert(`Berhasil simpan siswa ke ${selectedClassForStudent}!`);
   };
 
-  // --- FITUR BARU: BACKUP & RESTORE ---
-  
-  // 1. Download Data (Backup)
   const handleBackup = () => {
-    const fullData = {
-      journals: journals,
-      schoolData: schoolData,
-      version: "3.1",
-      backupDate: new Date().toLocaleDateString()
-    };
-    
+    const fullData = { journals, schoolData, version: "4.0", backupDate: new Date().toLocaleDateString() };
     const blob = new Blob([JSON.stringify(fullData)], { type: 'application/json' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -78,35 +104,27 @@ export default function JurnalGuru() {
     link.click();
   };
 
-  // 2. Upload Data (Restore)
   const handleRestore = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
-    if (window.confirm("PERINGATAN: Data saat ini akan DITIMPA dengan data dari file backup. Lanjutkan?")) {
+    if (window.confirm("PERINGATAN: Data saat ini akan DITIMPA. Lanjutkan?")) {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const data = JSON.parse(e.target.result);
           if (data.journals && data.schoolData) {
-            // Simpan ke LocalStorage
             localStorage.setItem('jurnal_guru_data', JSON.stringify(data.journals));
             localStorage.setItem('data_sekolah', JSON.stringify(data.schoolData));
-            alert("Data berhasil dikembalikan! Aplikasi akan refresh.");
-            window.location.reload(); // Refresh halaman agar state terupdate
-          } else {
-            alert("File tidak valid! Pastikan file .json yang benar.");
-          }
-        } catch (error) {
-          alert("Gagal membaca file backup.");
-        }
+            alert("Data berhasil direstore! Refreshing...");
+            window.location.reload();
+          } else { alert("File backup tidak valid!"); }
+        } catch (error) { alert("Gagal membaca file."); }
       };
       reader.readAsText(file);
     }
   };
 
-
-  // --- 4. LOGIC JURNAL & ABSENSI ---
+  // --- 5. LOGIC JURNAL ---
   const loadDefaultAttendance = (className) => {
     if (schoolData[className]) {
       const initialAbsen = {};
@@ -194,15 +212,17 @@ export default function JurnalGuru() {
   );
   const classList = Object.keys(schoolData);
 
-  // --- 5. TAMPILAN (UI) ---
+  // --- 6. TAMPILAN (UI) ---
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', fontFamily: 'sans-serif', border: '1px solid #ddd', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       <header style={{ padding: '15px', background: editingId ? '#d97706' : '#2563eb', color: 'white', textAlign: 'center', transition: '0.3s' }}>
-        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v3.1'}</h2>
+        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.0'}</h2>
         <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.9, fontWeight: 'normal' }}>
-         CyberCom Since 2000 (c) Lukman Nulkhikmat @2026
+          CyberCom Since 2000 &copy Lukman Nulkhikmat @ 2026
         </div>
+        {/* Indikator Login Admin */}
+        {isAdminUnlocked && activeTab === 'manage' && <small style={{background: '#16a34a', padding: '2px 8px', borderRadius: '10px', fontSize: '10px'}}>ADMIN ACCESS</small>}
       </header>
 
       <main style={{ flex: 1, padding: '20px', background: '#f8fafc', paddingBottom: '80px' }}>
@@ -244,7 +264,11 @@ export default function JurnalGuru() {
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <div>
-            <h3>📚 Riwayat</h3>
+            <h3>📚 Riwayat & Laporan</h3>
+            
+            {/* FITUR DOWNLOAD PINDAH KE SINI (BISA DIAKSES SEMUA GURU) */}
+            <button onClick={downloadReport} style={{...buttonStyle, width: '100%', background: '#0ea5e9', marginBottom: '15px'}}>📥 Download Excel Laporan</button>
+
             <input type="text" placeholder="🔍 Cari..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{...inputStyle, width: '93%', marginBottom: '15px'}} />
             {filteredJournals.map((j) => (
               <div key={j.id} style={cardStyle}>
@@ -263,64 +287,85 @@ export default function JurnalGuru() {
           </div>
         )}
 
-        {/* MANAGE TAB */}
+        {/* MANAGE TAB (PROTECTED) */}
         {activeTab === 'manage' && (
           <div>
-            <h3>⚙️ Data Sekolah</h3>
-            {/* ... Bagian Tambah Kelas & Input Siswa SAMA SEPERTI SEBELUMNYA ... */}
-            <div style={cardStyle}>
-              <h4>1. Tambah Kelas</h4>
-              <div style={{display: 'flex', gap: '5px'}}>
-                <input type="text" placeholder="Nama Kelas" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} style={{...inputStyle, flex: 1}} />
-                <button onClick={addClass} style={{...buttonStyle, padding: '0 15px'}}>+ Buat</button>
+            <h3>⚙️ Pengaturan Admin</h3>
+            
+            {/* LOGIC KUNCI / BUKA GEMBOK */}
+            {!isAdminUnlocked ? (
+              // TAMPILAN TERKUNCI
+              <div style={{textAlign: 'center', marginTop: '50px'}}>
+                <div style={{fontSize: '50px', marginBottom: '20px'}}>🔒</div>
+                <p>Masukkan PIN untuk mengakses menu ini.</p>
+                <form onSubmit={handleLoginAdmin}>
+                  <input 
+                    type="password" 
+                    placeholder="PIN Admin" 
+                    value={inputPin}
+                    onChange={(e) => setInputPin(e.target.value)}
+                    style={{...inputStyle, textAlign: 'center', fontSize: '20px', letterSpacing: '5px', width: '150px'}}
+                    maxLength={6}
+                  />
+                  <br/><br/>
+                  <button type="submit" style={buttonStyle}>Buka Gembok 🔓</button>
+                </form>
               </div>
-              <div style={{marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
-                {classList.map(c => <span key={c} style={{background: '#e0f2fe', padding: '5px', borderRadius: '15px', fontSize: '12px'}}>{c} <span onClick={() => deleteClass(c)} style={{color:'red', cursor:'pointer'}}>×</span></span>)}
+            ) : (
+              // TAMPILAN TERBUKA (ADMIN PANEL)
+              <div>
+                <button onClick={handleLogoutAdmin} style={{...buttonStyle, background: '#334155', width: '100%', marginBottom: '20px'}}>🔒 Kunci Kembali (Logout)</button>
+
+                <div style={cardStyle}>
+                  <h4>1. Tambah Kelas</h4>
+                  <div style={{display: 'flex', gap: '5px'}}>
+                    <input type="text" placeholder="Nama Kelas" value={newClassName} onChange={(e) => setNewClassName(e.target.value)} style={{...inputStyle, flex: 1}} />
+                    <button onClick={addClass} style={{...buttonStyle, padding: '0 15px'}}>+ Buat</button>
+                  </div>
+                  <div style={{marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '5px'}}>
+                    {classList.map(c => <span key={c} style={{background: '#e0f2fe', padding: '5px', borderRadius: '15px', fontSize: '12px'}}>{c} <span onClick={() => deleteClass(c)} style={{color:'red', cursor:'pointer'}}>×</span></span>)}
+                  </div>
+                </div>
+
+                <div style={cardStyle}>
+                  <h4>2. Input Siswa</h4>
+                  <select value={selectedClassForStudent} onChange={(e) => setSelectedClassForStudent(e.target.value)} style={{...inputStyle, width: '100%', marginBottom: '10px', background:'white'}}>
+                    <option value="">-- Pilih Kelas --</option>
+                    {classList.map(c => <option key={c} value={c}>{c} ({schoolData[c].length} Siswa)</option>)}
+                  </select>
+                  <textarea placeholder="Paste nama siswa..." rows="5" value={studentListInput} onChange={(e) => setStudentListInput(e.target.value)} style={{...inputStyle, width: '93%'}} />
+                  <button onClick={saveStudents} style={{...buttonStyle, width: '100%', marginTop:'10px', background:'#16a34a'}}>Simpan Siswa</button>
+                </div>
+
+                <div style={{...cardStyle, border: '1px solid #8b5cf6'}}>
+                  <h4 style={{color: '#7c3aed'}}>3. Backup & Restore</h4>
+                  <button onClick={handleBackup} style={{...buttonStyle, width: '100%', background: '#8b5cf6', marginBottom: '10px'}}>☁️ Backup Data</button>
+                  <p style={{fontSize: '12px', fontWeight: 'bold'}}>Restore:</p>
+                  <input type="file" accept=".json" onChange={handleRestore} style={{fontSize: '12px'}} />
+                </div>
+
+                {/* FITUR GANTI PIN */}
+                <div style={cardStyle}>
+                  <h4>4. Ganti PIN Admin</h4>
+                  <div style={{display: 'flex', gap: '5px'}}>
+                    <input type="number" placeholder="PIN Baru" value={newPinInput} onChange={(e) => setNewPinInput(e.target.value)} style={{...inputStyle, flex: 1}} />
+                    <button onClick={handleChangePin} style={{...buttonStyle, background: '#0f172a'}}>Ganti</button>
+                  </div>
+                </div>
+
+                <div style={{marginTop: '20px'}}>
+                  <button onClick={() => { if(window.confirm('Hapus SEMUA data?')) { setJournals([]); setSchoolData({}); localStorage.clear(); window.location.reload(); } }} style={{...buttonStyle, width: '100%', background: '#ef4444'}}>🗑️ Reset Total</button>
+                </div>
               </div>
-            </div>
-
-            <div style={cardStyle}>
-              <h4>2. Input Siswa</h4>
-              <select value={selectedClassForStudent} onChange={(e) => setSelectedClassForStudent(e.target.value)} style={{...inputStyle, width: '100%', marginBottom: '10px', background:'white'}}>
-                <option value="">-- Pilih Kelas --</option>
-                {classList.map(c => <option key={c} value={c}>{c} ({schoolData[c].length} Siswa)</option>)}
-              </select>
-              <textarea placeholder="Paste nama siswa..." rows="5" value={studentListInput} onChange={(e) => setStudentListInput(e.target.value)} style={{...inputStyle, width: '93%'}} />
-              <button onClick={saveStudents} style={{...buttonStyle, width: '100%', marginTop:'10px', background:'#16a34a'}}>Simpan Siswa</button>
-            </div>
-
-            <div style={cardStyle}>
-              <h4>3. Laporan Bulanan</h4>
-              <button onClick={downloadReport} style={{...buttonStyle, width: '100%', background: '#0ea5e9'}}>📥 Download Excel (Laporan)</button>
-            </div>
-
-            {/* BAGIAN BARU: BACKUP & RESTORE */}
-            <div style={{...cardStyle, border: '1px solid #8b5cf6'}}>
-              <h4 style={{color: '#7c3aed'}}>4. Backup & Restore Data</h4>
-              <p style={{fontSize: '12px', color: '#555'}}>Pindahkan data ke HP lain atau amankan data.</p>
-              
-              <button onClick={handleBackup} style={{...buttonStyle, width: '100%', background: '#8b5cf6', marginBottom: '15px'}}>
-                ☁️ Backup Data (Download File)
-              </button>
-
-              <div style={{borderTop: '1px dashed #ccc', paddingTop: '10px'}}>
-                <p style={{fontSize: '12px', fontWeight: 'bold', marginBottom: '5px'}}>Restore (Upload File Backup):</p>
-                <input type="file" accept=".json" onChange={handleRestore} style={{fontSize: '12px'}} />
-              </div>
-            </div>
-
-            <div style={{marginTop: '20px'}}>
-             <button onClick={() => { if(window.confirm('Hapus SEMUA data?')) { setJournals([]); setSchoolData({}); localStorage.clear(); window.location.reload(); } }} style={{...buttonStyle, width: '100%', background: '#ef4444'}}>🗑️ Reset Total Aplikasi</button>
-            </div>
+            )}
           </div>
         )}
       </main>
       
-      {/* NAVIGASI SAMA */}
       <nav style={{ display: 'flex', borderTop: '1px solid #ddd', background: 'white', position: 'fixed', bottom: 0, width: '100%', maxWidth: '400px' }}>
         <button style={navButtonStyle(activeTab === 'input')} onClick={() => setActiveTab('input')}>{editingId ? '✏️ Edit' : '✏️ Input'}</button>
         <button style={navButtonStyle(activeTab === 'history')} onClick={() => setActiveTab('history')}>📜 Riwayat</button>
-        <button style={navButtonStyle(activeTab === 'manage')} onClick={() => setActiveTab('manage')}>⚙️ Atur</button>
+        <button style={navButtonStyle(activeTab === 'manage')} onClick={() => setActiveTab('manage')}>⚙️ {activeTab === 'manage' && !isAdminUnlocked ? '🔒' : ''} Atur</button>
       </nav>
     </div>
   );
