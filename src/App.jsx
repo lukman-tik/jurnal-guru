@@ -10,7 +10,7 @@ export default function JurnalGuru() {
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false); 
   const [inputPin, setInputPin] = useState(''); 
   const [savedPin, setSavedPin] = useState(() => {
-    return localStorage.getItem('jurnal_guru_pin') || '1234'; 
+    return localStorage.getItem('jurnal_guru_pin') || '1007'; 
   });
 
   // DATABASE JURNAL
