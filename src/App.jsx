@@ -6,11 +6,11 @@ export default function JurnalGuru() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null); 
 
-  // STATE KEAMANAN (BARU)
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false); // Apakah gembok terbuka?
-  const [inputPin, setInputPin] = useState(''); // PIN yang diketik user
+  // STATE KEAMANAN
+  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false); 
+  const [inputPin, setInputPin] = useState(''); 
   const [savedPin, setSavedPin] = useState(() => {
-    return localStorage.getItem('jurnal_guru_pin') || '1007'; // PIN Default 1007
+    return localStorage.getItem('jurnal_guru_pin') || '1234'; 
   });
 
   // DATABASE JURNAL
@@ -33,7 +33,7 @@ export default function JurnalGuru() {
   const [newClassName, setNewClassName] = useState('');
   const [selectedClassForStudent, setSelectedClassForStudent] = useState('');
   const [studentListInput, setStudentListInput] = useState('');
-  const [newPinInput, setNewPinInput] = useState(''); // Untuk form ganti PIN
+  const [newPinInput, setNewPinInput] = useState(''); 
 
   // --- 2. EFEK SAMPING (AUTO SAVE) ---
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function JurnalGuru() {
     localStorage.setItem('jurnal_guru_pin', savedPin);
   }, [savedPin]);
 
-  // --- 3. LOGIC KEAMANAN (LOGIN ADMIN) ---
+  // --- 3. LOGIC KEAMANAN ---
   const handleLoginAdmin = (e) => {
     e.preventDefault();
     if (inputPin === savedPin) {
@@ -68,7 +68,7 @@ export default function JurnalGuru() {
     if (newPinInput.length < 4) return alert("PIN minimal 4 angka!");
     setSavedPin(newPinInput);
     setNewPinInput('');
-    alert("PIN Admin berhasil diganti! Jangan sampai lupa ya.");
+    alert("PIN Admin berhasil diganti!");
   };
 
   // --- 4. LOGIC MANAJEMEN DATA ---
@@ -95,8 +95,10 @@ export default function JurnalGuru() {
     alert(`Berhasil simpan siswa ke ${selectedClassForStudent}!`);
   };
 
+  // --- LOGIC UTILITIES (BACKUP, RESTORE, DOWNLOAD) ---
+  // Fungsi ini bisa dipanggil dari USER maupun ADMIN
   const handleBackup = () => {
-    const fullData = { journals, schoolData, version: "4.0", backupDate: new Date().toLocaleDateString() };
+    const fullData = { journals, schoolData, version: "4.1", backupDate: new Date().toLocaleDateString() };
     const blob = new Blob([JSON.stringify(fullData)], { type: 'application/json' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -107,7 +109,8 @@ export default function JurnalGuru() {
   const handleRestore = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    if (window.confirm("PERINGATAN: Data saat ini akan DITIMPA. Lanjutkan?")) {
+    // Peringatan keras karena Restore User akan menimpa data User
+    if (window.confirm("PERINGATAN KERAS:\nRestore akan MENIMPA/MENGGANTI seluruh data di HP ini dengan data dari file.\n\nApakah Anda yakin?")) {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -115,13 +118,32 @@ export default function JurnalGuru() {
           if (data.journals && data.schoolData) {
             localStorage.setItem('jurnal_guru_data', JSON.stringify(data.journals));
             localStorage.setItem('data_sekolah', JSON.stringify(data.schoolData));
-            alert("Data berhasil direstore! Refreshing...");
+            alert("✅ Sukses! Data berhasil diperbarui.");
             window.location.reload();
           } else { alert("File backup tidak valid!"); }
         } catch (error) { alert("Gagal membaca file."); }
       };
       reader.readAsText(file);
     }
+  };
+
+  const downloadReport = () => {
+    if (journals.length === 0) return alert("Data kosong!");
+    let csv = "Tanggal,Kelas,Mapel,Catatan,Rekap Absen,Detail Tidak Hadir\n";
+    journals.forEach(row => {
+      let absentDetails = [];
+      if (row.attendanceData) {
+        Object.entries(row.attendanceData).forEach(([name, status]) => {
+          if (status !== 'H') absentDetails.push(`${name}(${status})`);
+        });
+      }
+      csv += `${row.tanggal},${row.kelas},${row.mapel},"${row.catatan}","${row.summaryText || '-'}","${absentDetails.join("; ")}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "Laporan_Jurnal.csv";
+    link.click();
   };
 
   // --- 5. LOGIC JURNAL ---
@@ -187,25 +209,6 @@ export default function JurnalGuru() {
     setAttendance({});
   };
 
-  const downloadReport = () => {
-    if (journals.length === 0) return alert("Data kosong!");
-    let csv = "Tanggal,Kelas,Mapel,Catatan,Rekap Absen,Detail Tidak Hadir\n";
-    journals.forEach(row => {
-      let absentDetails = [];
-      if (row.attendanceData) {
-        Object.entries(row.attendanceData).forEach(([name, status]) => {
-          if (status !== 'H') absentDetails.push(`${name}(${status})`);
-        });
-      }
-      csv += `${row.tanggal},${row.kelas},${row.mapel},"${row.catatan}","${row.summaryText || '-'}","${absentDetails.join("; ")}"\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "Laporan_Jurnal.csv";
-    link.click();
-  };
-
   const filteredJournals = journals.filter(j => 
     j.kelas.toLowerCase().includes(searchTerm.toLowerCase()) ||
     j.mapel.toLowerCase().includes(searchTerm.toLowerCase())
@@ -217,11 +220,10 @@ export default function JurnalGuru() {
     <div style={{ maxWidth: '400px', margin: '0 auto', fontFamily: 'sans-serif', border: '1px solid #ddd', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       <header style={{ padding: '15px', background: editingId ? '#d97706' : '#2563eb', color: 'white', textAlign: 'center', transition: '0.3s' }}>
-        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.0'}</h2>
+        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.1'}</h2>
         <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.9, fontWeight: 'normal' }}>
-          CyberCom Since 2000 &copy Lukman Nulkhikmat @ 2026
+          CyberCom Since 2000 (c) Lukman Nulkhikmat @ 2026
         </div>
-        {/* Indikator Login Admin */}
         {isAdminUnlocked && activeTab === 'manage' && <small style={{background: '#16a34a', padding: '2px 8px', borderRadius: '10px', fontSize: '10px'}}>ADMIN ACCESS</small>}
       </header>
 
@@ -261,13 +263,30 @@ export default function JurnalGuru() {
           </div>
         )}
 
-        {/* HISTORY TAB */}
+        {/* HISTORY TAB (DI SINI ADA MENU BACKUP USER) */}
         {activeTab === 'history' && (
           <div>
-            <h3>📚 Riwayat & Laporan</h3>
+            <h3>📚 Riwayat & Data</h3>
             
-            {/* FITUR DOWNLOAD PINDAH KE SINI (BISA DIAKSES SEMUA GURU) */}
-            <button onClick={downloadReport} style={{...buttonStyle, width: '100%', background: '#0ea5e9', marginBottom: '15px'}}>📥 Download Excel Laporan</button>
+            {/* KOTAK MENU DATA USER */}
+            <div style={{...cardStyle, borderLeft: '5px solid #0ea5e9'}}>
+              <h4 style={{marginTop: 0, color: '#0284c7'}}>📂 Menu Data</h4>
+              
+              <button onClick={downloadReport} style={{...buttonStyle, width: '100%', background: '#0ea5e9', marginBottom: '10px', fontSize: '12px'}}>
+                📥 Download Laporan (Excel)
+              </button>
+
+              <div style={{display: 'flex', gap: '5px'}}>
+                <button onClick={handleBackup} style={{...buttonStyle, flex: 1, background: '#64748b', fontSize: '12px'}}>
+                  ☁️ Backup
+                </button>
+                <div style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
+                  <button style={{...buttonStyle, width: '100%', background: '#f97316', fontSize: '12px'}}>📂 Restore</button>
+                  <input type="file" accept=".json" onChange={handleRestore} style={{position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer'}} />
+                </div>
+              </div>
+              <small style={{fontSize: '10px', color: '#666', display: 'block', marginTop: '5px'}}>*Restore akan menimpa data yang ada.</small>
+            </div>
 
             <input type="text" placeholder="🔍 Cari..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{...inputStyle, width: '93%', marginBottom: '15px'}} />
             {filteredJournals.map((j) => (
@@ -292,29 +311,19 @@ export default function JurnalGuru() {
           <div>
             <h3>⚙️ Pengaturan Admin</h3>
             
-            {/* LOGIC KUNCI / BUKA GEMBOK */}
             {!isAdminUnlocked ? (
-              // TAMPILAN TERKUNCI
               <div style={{textAlign: 'center', marginTop: '50px'}}>
                 <div style={{fontSize: '50px', marginBottom: '20px'}}>🔒</div>
-                <p>Masukkan PIN untuk mengakses menu ini.</p>
+                <p>Masukkan PIN Admin</p>
                 <form onSubmit={handleLoginAdmin}>
-                  <input 
-                    type="password" 
-                    placeholder="PIN Admin" 
-                    value={inputPin}
-                    onChange={(e) => setInputPin(e.target.value)}
-                    style={{...inputStyle, textAlign: 'center', fontSize: '20px', letterSpacing: '5px', width: '150px'}}
-                    maxLength={6}
-                  />
+                  <input type="password" placeholder="PIN" value={inputPin} onChange={(e) => setInputPin(e.target.value)} style={{...inputStyle, textAlign: 'center', fontSize: '20px', letterSpacing: '5px', width: '150px'}} maxLength={6} />
                   <br/><br/>
                   <button type="submit" style={buttonStyle}>Buka Gembok 🔓</button>
                 </form>
               </div>
             ) : (
-              // TAMPILAN TERBUKA (ADMIN PANEL)
               <div>
-                <button onClick={handleLogoutAdmin} style={{...buttonStyle, background: '#334155', width: '100%', marginBottom: '20px'}}>🔒 Kunci Kembali (Logout)</button>
+                <button onClick={handleLogoutAdmin} style={{...buttonStyle, background: '#334155', width: '100%', marginBottom: '20px'}}>🔒 Logout Admin</button>
 
                 <div style={cardStyle}>
                   <h4>1. Tambah Kelas</h4>
@@ -338,13 +347,16 @@ export default function JurnalGuru() {
                 </div>
 
                 <div style={{...cardStyle, border: '1px solid #8b5cf6'}}>
-                  <h4 style={{color: '#7c3aed'}}>3. Backup & Restore</h4>
-                  <button onClick={handleBackup} style={{...buttonStyle, width: '100%', background: '#8b5cf6', marginBottom: '10px'}}>☁️ Backup Data</button>
-                  <p style={{fontSize: '12px', fontWeight: 'bold'}}>Restore:</p>
-                  <input type="file" accept=".json" onChange={handleRestore} style={{fontSize: '12px'}} />
+                  <h4 style={{color: '#7c3aed'}}>3. Backup & Restore (Admin)</h4>
+                  <div style={{display: 'flex', gap: '5px'}}>
+                    <button onClick={handleBackup} style={{...buttonStyle, width: '100%', background: '#8b5cf6', fontSize: '12px'}}>☁️ Backup</button>
+                    <div style={{width: '100%', position: 'relative', overflow: 'hidden'}}>
+                      <button style={{...buttonStyle, width: '100%', background: '#7c3aed', fontSize: '12px'}}>📂 Restore</button>
+                      <input type="file" accept=".json" onChange={handleRestore} style={{position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer'}} />
+                    </div>
+                  </div>
                 </div>
 
-                {/* FITUR GANTI PIN */}
                 <div style={cardStyle}>
                   <h4>4. Ganti PIN Admin</h4>
                   <div style={{display: 'flex', gap: '5px'}}>
