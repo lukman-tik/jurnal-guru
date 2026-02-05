@@ -80,7 +80,8 @@ export default function JurnalGuru() {
   };
 
   const deleteClass = (className) => {
-    if (window.confirm(`Hapus kelas ${className}? Data siswa hilang.`)) {
+    // KONFIRMASI HAPUS KELAS
+    if (window.confirm(`⚠️ PERINGATAN:\n\nApakah Anda yakin ingin menghapus KELAS ${className}?\nSemua data siswa di dalamnya akan ikut terhapus.`)) {
       const newData = { ...schoolData };
       delete newData[className];
       setSchoolData(newData);
@@ -95,10 +96,8 @@ export default function JurnalGuru() {
     alert(`Berhasil simpan siswa ke ${selectedClassForStudent}!`);
   };
 
-  // --- LOGIC UTILITIES (BACKUP, RESTORE, DOWNLOAD) ---
-  // Fungsi ini bisa dipanggil dari USER maupun ADMIN
   const handleBackup = () => {
-    const fullData = { journals, schoolData, version: "4.1", backupDate: new Date().toLocaleDateString() };
+    const fullData = { journals, schoolData, version: "4.2", backupDate: new Date().toLocaleDateString() };
     const blob = new Blob([JSON.stringify(fullData)], { type: 'application/json' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -109,8 +108,7 @@ export default function JurnalGuru() {
   const handleRestore = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    // Peringatan keras karena Restore User akan menimpa data User
-    if (window.confirm("PERINGATAN KERAS:\nRestore akan MENIMPA/MENGGANTI seluruh data di HP ini dengan data dari file.\n\nApakah Anda yakin?")) {
+    if (window.confirm("⚠️ RESTORE DATA:\n\nApakah Anda yakin? Data di HP ini akan diganti sepenuhnya dengan data dari file backup.")) {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -146,7 +144,7 @@ export default function JurnalGuru() {
     link.click();
   };
 
-  // --- 5. LOGIC JURNAL ---
+  // --- 5. LOGIC JURNAL (Input, Edit, Hapus) ---
   const loadDefaultAttendance = (className) => {
     if (schoolData[className]) {
       const initialAbsen = {};
@@ -177,6 +175,14 @@ export default function JurnalGuru() {
     setEditingId(null);
     setFormData({ kelas: '', mapel: '', catatan: '' });
     setAttendance({});
+  };
+
+  // --- FUNGSI BARU: HAPUS DENGAN KONFIRMASI TEGAS ---
+  const handleDeleteJournal = (id) => {
+    if (window.confirm("❓ KONFIRMASI HAPUS:\n\nApakah Anda yakin ingin menghapus jurnal ini?\nData yang dihapus tidak bisa dikembalikan.")) {
+      const updatedJournals = journals.filter((j) => j.id !== id);
+      setJournals(updatedJournals);
+    }
   };
 
   const handleSubmit = (e) => {
@@ -220,9 +226,9 @@ export default function JurnalGuru() {
     <div style={{ maxWidth: '400px', margin: '0 auto', fontFamily: 'sans-serif', border: '1px solid #ddd', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       <header style={{ padding: '15px', background: editingId ? '#d97706' : '#2563eb', color: 'white', textAlign: 'center', transition: '0.3s' }}>
-        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.1'}</h2>
+        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.2'}</h2>
         <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.9, fontWeight: 'normal' }}>
-          CyberCom Since 2000 (c) Lukman Nulkhikmat @ 2026
+          CyberCom Since 2000 (c) Lukman Nulkhikmat @2026
         </div>
         {isAdminUnlocked && activeTab === 'manage' && <small style={{background: '#16a34a', padding: '2px 8px', borderRadius: '10px', fontSize: '10px'}}>ADMIN ACCESS</small>}
       </header>
@@ -263,23 +269,16 @@ export default function JurnalGuru() {
           </div>
         )}
 
-        {/* HISTORY TAB (DI SINI ADA MENU BACKUP USER) */}
+        {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <div>
             <h3>📚 Riwayat & Data</h3>
             
-            {/* KOTAK MENU DATA USER */}
             <div style={{...cardStyle, borderLeft: '5px solid #0ea5e9'}}>
               <h4 style={{marginTop: 0, color: '#0284c7'}}>📂 Menu Data</h4>
-              
-              <button onClick={downloadReport} style={{...buttonStyle, width: '100%', background: '#0ea5e9', marginBottom: '10px', fontSize: '12px'}}>
-                📥 Download Laporan (Excel)
-              </button>
-
+              <button onClick={downloadReport} style={{...buttonStyle, width: '100%', background: '#0ea5e9', marginBottom: '10px', fontSize: '12px'}}>📥 Download Laporan (Excel)</button>
               <div style={{display: 'flex', gap: '5px'}}>
-                <button onClick={handleBackup} style={{...buttonStyle, flex: 1, background: '#64748b', fontSize: '12px'}}>
-                  ☁️ Backup
-                </button>
+                <button onClick={handleBackup} style={{...buttonStyle, flex: 1, background: '#64748b', fontSize: '12px'}}>☁️ Backup</button>
                 <div style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
                   <button style={{...buttonStyle, width: '100%', background: '#f97316', fontSize: '12px'}}>📂 Restore</button>
                   <input type="file" accept=".json" onChange={handleRestore} style={{position: 'absolute', top: 0, left: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer'}} />
@@ -289,13 +288,15 @@ export default function JurnalGuru() {
             </div>
 
             <input type="text" placeholder="🔍 Cari..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{...inputStyle, width: '93%', marginBottom: '15px'}} />
+            
             {filteredJournals.map((j) => (
               <div key={j.id} style={cardStyle}>
                 <div style={{display: 'flex', justifyContent: 'space-between'}}>
                   <h4 style={{margin: 0, color: '#2563eb'}}>{j.kelas}</h4>
                   <div style={{display: 'flex', gap: '5px'}}>
                     <button onClick={() => startEditing(j)} style={{...deleteButtonStyle, background: '#fef08a', color: '#854d0e'}}>✏️</button>
-                    <button onClick={() => { if(window.confirm('Hapus?')) setJournals(journals.filter(x => x.id !== j.id)) }} style={deleteButtonStyle}>🗑️</button>
+                    {/* TOMBOL HAPUS YANG SUDAH DIAMANKAN */}
+                    <button onClick={() => handleDeleteJournal(j.id)} style={deleteButtonStyle}>🗑️</button>
                   </div>
                 </div>
                 <small style={{color: '#666'}}>{j.tanggal}</small>
@@ -306,7 +307,7 @@ export default function JurnalGuru() {
           </div>
         )}
 
-        {/* MANAGE TAB (PROTECTED) */}
+        {/* MANAGE TAB */}
         {activeTab === 'manage' && (
           <div>
             <h3>⚙️ Pengaturan Admin</h3>
@@ -366,7 +367,7 @@ export default function JurnalGuru() {
                 </div>
 
                 <div style={{marginTop: '20px'}}>
-                  <button onClick={() => { if(window.confirm('Hapus SEMUA data?')) { setJournals([]); setSchoolData({}); localStorage.clear(); window.location.reload(); } }} style={{...buttonStyle, width: '100%', background: '#ef4444'}}>🗑️ Reset Total</button>
+                  <button onClick={() => { if(window.confirm('⚠️ PERINGATAN KERAS:\nHapus SEMUA data aplikasi ini?\nTindakan ini tidak bisa dibatalkan!')) { setJournals([]); setSchoolData({}); localStorage.clear(); window.location.reload(); } }} style={{...buttonStyle, width: '100%', background: '#ef4444'}}>🗑️ Reset Total</button>
                 </div>
               </div>
             )}
