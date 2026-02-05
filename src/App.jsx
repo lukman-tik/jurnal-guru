@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 export default function JurnalGuru() {
   // 1. STATE MANAGEMENT
   const [activeTab, setActiveTab] = useState('input');
-  const [searchTerm, setSearchTerm] = useState(''); // State baru untuk kata kunci pencarian
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [journals, setJournals] = useState(() => {
     const saved = localStorage.getItem('jurnal_guru_data');
@@ -56,8 +56,32 @@ export default function JurnalGuru() {
     }
   };
 
-  // LOGIC PENCARIAN (Filter)
-  // Kita saring jurnal berdasarkan kata kunci yang diketik
+  // FITUR BARU: DOWNLOAD KE EXCEL (CSV)
+  const downloadReport = () => {
+    if (journals.length === 0) return alert("Belum ada data untuk didownload!");
+
+    // 1. Buat Header CSV
+    let csvContent = "Tanggal,Kelas,Mapel,Catatan\n";
+
+    // 2. Masukkan Data baris per baris
+    journals.forEach(row => {
+      // Kita bungkus catatan pakai tanda kutip biar aman kalau ada koma di dalam teks
+      csvContent += `${row.tanggal},${row.kelas},${row.mapel},"${row.catatan}"\n`;
+    });
+
+    // 3. Buat File Virtual & Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", "Laporan_Jurnal_Guru.csv"); // Nama filenya
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Filter Search
   const filteredJournals = journals.filter((jurnal) => 
     jurnal.kelas.toLowerCase().includes(searchTerm.toLowerCase()) ||
     jurnal.mapel.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,7 +93,7 @@ export default function JurnalGuru() {
     <div style={{ maxWidth: '400px', margin: '0 auto', fontFamily: 'sans-serif', border: '1px solid #ddd', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       <header style={{ padding: '15px', background: '#2563eb', color: 'white', textAlign: 'center' }}>
-        <h2 style={{ margin: 0 }}>📘 Jurnal Guru v1.2</h2>
+        <h2 style={{ margin: 0 }}>📘 Jurnal Guru v1.3</h2>
       </header>
 
       <main style={{ flex: 1, padding: '20px', background: '#f8fafc', paddingBottom: '80px' }}>
@@ -87,12 +111,10 @@ export default function JurnalGuru() {
           </div>
         )}
 
-        {/* TAB HISTORY (DENGAN PENCARIAN) */}
+        {/* TAB HISTORY */}
         {activeTab === 'history' && (
           <div>
             <h3>📚 Riwayat Jurnal</h3>
-            
-            {/* KOTAK PENCARIAN BARU */}
             <input 
               type="text" 
               placeholder="🔍 Cari kelas, mapel, atau siswa..." 
@@ -100,9 +122,7 @@ export default function JurnalGuru() {
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{...inputStyle, width: '93%', marginBottom: '15px', borderColor: '#2563eb'}}
             />
-
             {journals.length === 0 ? <p style={{color: '#888'}}>Belum ada catatan.</p> : (
-              // Perhatikan: Kita map dari 'filteredJournals', bukan 'journals' lagi
               filteredJournals.length > 0 ? (
                 filteredJournals.map((jurnal) => (
                   <div key={jurnal.id} style={cardStyle}>
@@ -116,24 +136,29 @@ export default function JurnalGuru() {
                     <p style={{margin: 0}}>{jurnal.catatan}</p>
                   </div>
                 ))
-              ) : (
-                <p style={{textAlign: 'center', color: '#888'}}>Tidak ditemukan data yang cocok.</p>
-              )
+              ) : <p style={{textAlign: 'center', color: '#888'}}>Tidak ditemukan data yang cocok.</p>
             )}
           </div>
         )}
 
-        {/* TAB MANAGE */}
+        {/* TAB MANAGE (UPDATE: Ada Tombol Download) */}
         {activeTab === 'manage' && (
           <div>
             <h3>⚙️ Pengaturan</h3>
             <div style={cardStyle}>
               <p>Total Catatan: <strong>{journals.length}</strong></p>
-              <button onClick={clearAllData} style={{...buttonStyle, background: '#ef4444'}}>🗑️ Hapus SEMUA Data</button>
+              
+              {/* TOMBOL BARU: DOWNLOAD */}
+              <button onClick={downloadReport} style={{...buttonStyle, background: '#16a34a', width: '100%', marginBottom: '10px'}}>
+                📥 Download Laporan (Excel)
+              </button>
+
+              <button onClick={clearAllData} style={{...buttonStyle, background: '#ef4444', width: '100%'}}>
+                🗑️ Hapus SEMUA Data
+              </button>
             </div>
-            {/* Info tambahan */}
             <div style={{marginTop: '20px', padding: '10px', background: '#e0f2fe', borderRadius: '8px', fontSize: '13px', color: '#0369a1'}}>
-              💡 <strong>Tips:</strong> Gunakan fitur pencarian di menu Riwayat untuk memfilter catatan berdasarkan Kelas.
+              💡 <strong>Tips:</strong> File yang didownload berformat .csv, bisa langsung dibuka di Microsoft Excel atau Google Sheets.
             </div>
           </div>
         )}
@@ -149,7 +174,7 @@ export default function JurnalGuru() {
   );
 }
 
-// STYLE SAMA SEPERTI SEBELUMNYA
+// STYLE
 const inputStyle = { padding: '12px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px' };
 const buttonStyle = { padding: '12px', background: '#2563eb', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' };
 const cardStyle = { background: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '10px' };
