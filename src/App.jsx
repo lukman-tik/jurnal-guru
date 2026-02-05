@@ -9,6 +9,8 @@ export default function JurnalGuru() {
   // STATE KEAMANAN
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false); 
   const [inputPin, setInputPin] = useState(''); 
+  
+  // BAGIAN INI YANG DIUBAH (DEFAULT PIN 1007)
   const [savedPin, setSavedPin] = useState(() => {
     return localStorage.getItem('jurnal_guru_pin') || '1007'; 
   });
@@ -97,7 +99,7 @@ export default function JurnalGuru() {
   };
 
   const handleBackup = () => {
-    const fullData = { journals, schoolData, version: "4.2", backupDate: new Date().toLocaleDateString() };
+    const fullData = { journals, schoolData, version: "4.3", backupDate: new Date().toLocaleDateString() };
     const blob = new Blob([JSON.stringify(fullData)], { type: 'application/json' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -144,7 +146,7 @@ export default function JurnalGuru() {
     link.click();
   };
 
-  // --- 5. LOGIC JURNAL (Input, Edit, Hapus) ---
+  // --- 5. LOGIC JURNAL ---
   const loadDefaultAttendance = (className) => {
     if (schoolData[className]) {
       const initialAbsen = {};
@@ -177,7 +179,6 @@ export default function JurnalGuru() {
     setAttendance({});
   };
 
-  // --- FUNGSI BARU: HAPUS DENGAN KONFIRMASI TEGAS ---
   const handleDeleteJournal = (id) => {
     if (window.confirm("❓ KONFIRMASI HAPUS:\n\nApakah Anda yakin ingin menghapus jurnal ini?\nData yang dihapus tidak bisa dikembalikan.")) {
       const updatedJournals = journals.filter((j) => j.id !== id);
@@ -226,9 +227,9 @@ export default function JurnalGuru() {
     <div style={{ maxWidth: '400px', margin: '0 auto', fontFamily: 'sans-serif', border: '1px solid #ddd', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       <header style={{ padding: '15px', background: editingId ? '#d97706' : '#2563eb', color: 'white', textAlign: 'center', transition: '0.3s' }}>
-        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.2'}</h2>
+        <h2 style={{ margin: 0 }}>{editingId ? '✏️ Mode Edit' : '📘 Jurnal Guru v4.3'}</h2>
         <div style={{ fontSize: '10px', marginTop: '4px', opacity: 0.9, fontWeight: 'normal' }}>
-          CyberCom Since 2000 (c) Lukman Nulkhikmat @2026
+         CyberCom Since 2000 (c) Lukman Nulkhikmat @2026
         </div>
         {isAdminUnlocked && activeTab === 'manage' && <small style={{background: '#16a34a', padding: '2px 8px', borderRadius: '10px', fontSize: '10px'}}>ADMIN ACCESS</small>}
       </header>
@@ -295,7 +296,6 @@ export default function JurnalGuru() {
                   <h4 style={{margin: 0, color: '#2563eb'}}>{j.kelas}</h4>
                   <div style={{display: 'flex', gap: '5px'}}>
                     <button onClick={() => startEditing(j)} style={{...deleteButtonStyle, background: '#fef08a', color: '#854d0e'}}>✏️</button>
-                    {/* TOMBOL HAPUS YANG SUDAH DIAMANKAN */}
                     <button onClick={() => handleDeleteJournal(j.id)} style={deleteButtonStyle}>🗑️</button>
                   </div>
                 </div>
